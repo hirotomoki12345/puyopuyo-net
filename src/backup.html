@@ -146,35 +146,31 @@
 			currentPuyo.x += dx;
 		}
 	}
+function movePuyoDown() {
+	const { x, y, rotation } = currentPuyo;
 
-	function movePuyoDown() {
-		const {
-			x, y, rotation
-		} = currentPuyo;
+	// 落下する前に位置が有効かチェック
+	if (isValidPosition(x, y + 1, rotation)) {
+		currentPuyo.y++;
+	} else {
+		if (!waitingForFix) {
+			waitingForFix = true;
+			waitStartTime = Date.now();
+		}
 
-		// 落下する前に位置が有効かチェック
-		if (isValidPosition(x, y + 1, rotation)) {
-			currentPuyo.y++;
-		} else {
-			if (!waitingForFix) {
-				waitingForFix = true;
-				waitStartTime = Date.now();
-			}
+		// 下キーが押されている場合、設置までの時間を短縮
+		const effectiveWaitTime = keyState.ArrowDown ? waitingput / 4 : waitingput;
 
-			// 下キーが押されている場合、設置までの時間を短縮
-			const effectiveWaitTime = keyState.ArrowDown ? waitingput / 4 : waitingput;
-
-			if (waitingForFix && Date.now() - waitStartTime >= effectiveWaitTime) {
-				fixPuyo();
-				applyGravitySmoothly();
-				startChainProcessing();
-				currentPuyo = nextPuyo;
-				nextPuyo = generatePuyo();
-				waitingForFix = false;
-				upMoveCount = 0;
-			}
+		if (waitingForFix && Date.now() - waitStartTime >= effectiveWaitTime) {
+			fixPuyo();
+			applyGravitySmoothly();
+			startChainProcessing(); // 落下後に連鎖処理を開始
+			// ここで次のぷよを生成しない
+			waitingForFix = false;
+			upMoveCount = 0;
 		}
 	}
+}
 
 
 	function rotatePuyo(clockwise = true) {
@@ -199,37 +195,43 @@
 			!board[y][x] && !board[y + dy][x + dx]
 		);
 	}
+function fixPuyo() {
+    const { x, y, shape, rotation } = currentPuyo;
+    board[y][x] = shape[0].color;
+    const [dx, dy] = getRotationOffset(rotation);
+    board[y + dy][x + dx] = shape[1].color;
 
-	function fixPuyo() {
-		const {
-			x, y, shape, rotation
-		} = currentPuyo;
-		board[y][x] = shape[0].color;
-		const [dx, dy] = getRotationOffset(rotation);
-		board[y + dy][x + dx] = shape[1].color;
-	}
+    // 次のぷよを生成
+    nextPuyo = generatePuyo();
+    currentPuyo = nextPuyo; // 次のぷよをcurrentPuyoとしてセット
+    startChainProcessing(); // 落下後に連鎖処理を開始
+}
 
-	function startChainProcessing() {
-		isProcessingChain = true;
-		chainCount = 0;
-		performChains();
-	}
+        
+function startChainProcessing() {
+    if (isProcessingChain) return; // 連鎖処理が進行中であれば何もしない
+    isProcessingChain = true; // 連鎖中に設定
+    chainCount = 0;
+    performChains();
+}
 
-	function performChains() {
-		let chainOccurred = checkForChains();
-		if (chainOccurred) {
-			chainCount++;
-			applyGravity();
-			setTimeout(performChains, chainDelay);
-		} else {
-			isProcessingChain = false;
-			if (chainCount > 0) {
-				totalChains += chainCount; // 連鎖があった場合にのみtotalChainsを更新
-				chainCount = 0; // 連鎖数をリセット
-			}
-		}
-	}
-
+// 連鎖処理
+function performChains() {
+    let chainOccurred = checkForChains();
+    if (chainOccurred) {
+        chainCount++;
+        applyGravity(); // 連鎖後にぷよを落下させる
+        setTimeout(performChains, chainDelay);
+    } else {
+        // 連鎖が終わった
+        isProcessingChain = false;
+        if (chainCount > 0) {
+            totalChains += chainCount; // 連鎖があった場合にのみtotalChainsを更新
+            chainCount = 0; // 連鎖数をリセット
+        }
+        // 次のぷよを生成しない
+    }
+}
 	function checkForChains() {
 		let toClear = new Set();
             let toClearGray = new Set();  // グレーぷよを消すためのセット
