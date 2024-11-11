@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+	<meta charset="UTF-8">
+	<title>Puyo Puyo Game</title>
+	<style>
+	canvas { border: 1px solid black; }
+	</style>
+</head>
+
+<body>
+	<canvas id="gameCanvas" width="240" height="480"></canvas>
+	<script>
+	const canvas = document.getElementById("gameCanvas");
+	const ctx = canvas.getContext("2d");
+	const puyoSize = 40;
+	const rows = 12;
+	const cols = 6;
+	const colors = ["red", "blue", "green", "yellow", "purple", "gray"]; // "gray"を追加
+	let board = Array.from({
+		length: rows
+	}, () => Array(cols).fill(0));
+	let currentPuyo = generatePuyo();
+	let nextPuyo = generatePuyo();
+	let chainCount = 0;
+	let totalChains = 0;
+	let keyState = {
+		ArrowLeft: false,
+		ArrowRight: false,
+		ArrowDown: false
+	};
+	let lastMoveTime = 0;
+	let moveInterval = 100;
+	let dropInterval = 550;
+	let lastDropTime = 0;
+	let isProcessingChain = false;
+	let chainDelay = 1000;
+	let waitingForFix = false;
+	let waitStartTime = 0;
+	let waitingput = 500;
+	let upMoveCount = 0;
+	let imagesrc = 'img';
+	const images = {
+		red: new Image(),
+		blue: new Image(),
+		green: new Image(),
+		yellow: new Image(),
+		purple: new Image(),
+		gray: new Image() // gray画像を追加
+	};
+
+	// 各色の画像パスを指定
+	images.red.src = `${imagesrc}/red.png`;
+	images.blue.src = `${imagesrc}/blue.png`;
+	images.green.src = `${imagesrc}/green.png`;
+	images.yellow.src = `${imagesrc}/yellow.png`;
+	images.purple.src = `${imagesrc}/purple.png`;
+	images.gray.src = `${imagesrc}/gray.png`; // gray画像のパスを指定
+
+	function generatePuyo() {
+		return {
+			x: 2,
+			y: 0,
+			shape: [{
+					color: colors[Math.floor(Math.random() * (colors.length - 1))]
+				}, // グレーを除外
+				{
+					color: colors[Math.floor(Math.random() * (colors.length - 1))]
+				} // グレーを除外
+			],
+			rotation: 0
+		};
+	}
+
+
+	function drawBoard() {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		// 連鎖数を表示
+		ctx.font = "20px Arial";
+		ctx.fillStyle = "black";
+		ctx.fillText(`Chains: ${chainCount}`, 10, 30);
+
+		// 盤面の描画
+		for (let y = 0; y < rows; y++) {
+			for (let x = 0; x < cols; x++) {
+				if (board[y][x]) {
+					ctx.drawImage(images[board[y][x]], x * puyoSize, y * puyoSize, puyoSize,
+						puyoSize);
+				}
+			}
+		}
+	}
+
+	function drawPuyo(puyo) {
+		if (isProcessingChain) return;
+		ctx.drawImage(images[puyo.shape[0].color], puyo.x * puyoSize, puyo.y *
+			puyoSize, puyoSize, puyoSize);
+		const [dx, dy] = getRotationOffset(puyo.rotation);
+		ctx.drawImage(images[puyo.shape[1].color], (puyo.x + dx) * puyoSize, (puyo.y +
+			dy) * puyoSize, puyoSize, puyoSize);
+	}
+
+	function getRotationOffset(rotation) {
+		if (rotation === 0) return [1, 0];
+		if (rotation === 1) return [0, 1];
+		if (rotation === 2) return [-1, 0];
+		if (rotation === 3) return [0, -1];
+	}
+
+	function update() {
+		const now = Date.now();
+		checkGameOver(); // ゲームオーバー判定
+
+		if (now - lastDropTime > dropInterval && !isProcessingChain && !
+			gameOverDisplayed) {
+			movePuyoDown();
+			lastDropTime = now;
+		}
+		if (now - lastMoveTime > moveInterval && !gameOverDisplayed) {
+			handleInput();
+			lastMoveTime = now;
+		}
+		if (!gameOverDisplayed) {
+			drawBoard();
+			drawPuyo(currentPuyo);
+			drawInitialPuyo(); // 初期位置に❌を表示
+
+		}
+		requestAnimationFrame(update);
+	}
+
+	function handleInput() {
+		if (isProcessingChain) return;
+		if (keyState.ArrowLeft) movePuyo(-1);
+		if (keyState.ArrowRight) movePuyo(1);
+		if (keyState.ArrowDown) movePuyoDown();
+	}
+
+	function movePuyo(dx) {
+		const {
+			x, y, rotation
+		} = currentPuyo;
+		if (isValidPosition(x + dx, y, rotation)) {
+			currentPuyo.x += dx;
+		}
+	}
+
+	function movePuyoDown() {
+		const {
+			x, y, rotation
+		} = currentPuyo;
+
+		// 落下する前に位置が有効かチェック
+		if (isValidPosition(x, y + 1, rotation)) {
+			currentPuyo.y++;
+		} else {
+			if (!waitingForFix) {
+				waitingForFix = true;
+				waitStartTime = Date.now();
+			}
+
+			// 下キーが押されている場合、設置までの時間を短縮
+			const effectiveWaitTime = keyState.ArrowDown ? waitingput / 4 : waitingput;
+
+			if (waitingForFix && Date.now() - waitStartTime >= effectiveWaitTime) {
+				fixPuyo();
+				applyGravitySmoothly();
+				startChainProcessing();
+				currentPuyo = nextPuyo;
+				nextPuyo = generatePuyo();
+				waitingForFix = false;
+				upMoveCount = 0;
+			}
+		}
+	}
+
+
+	function rotatePuyo(clockwise = true) {
+		const {
+			x, y, rotation
+		} = currentPuyo;
+		const newRotation = (rotation + (clockwise ? 1 : 3)) % 4;
+		if (isValidPosition(x, y, newRotation)) {
+			currentPuyo.rotation = newRotation;
+		} else if (upMoveCount < 6 && isValidPosition(x, y - 1, newRotation)) {
+			currentPuyo.y -= 1;
+			currentPuyo.rotation = newRotation;
+			upMoveCount++;
+		}
+	}
+
+	function isValidPosition(x, y, rotation) {
+		const [dx, dy] = getRotationOffset(rotation);
+		return (
+			x >= 0 && x + dx >= 0 && x < cols && x + dx < cols &&
+			y >= 0 && y + dy >= 0 && y < rows && y + dy < rows &&
+			!board[y][x] && !board[y + dy][x + dx]
+		);
+	}
+
+	function fixPuyo() {
+		const {
+			x, y, shape, rotation
+		} = currentPuyo;
+		board[y][x] = shape[0].color;
+		const [dx, dy] = getRotationOffset(rotation);
+		board[y + dy][x + dx] = shape[1].color;
+	}
+
+	function startChainProcessing() {
+		isProcessingChain = true;
+		chainCount = 0;
+		performChains();
+	}
+
+	function performChains() {
+		let chainOccurred = checkForChains();
+		if (chainOccurred) {
+			chainCount++;
+			applyGravity();
+			setTimeout(performChains, chainDelay);
+		} else {
+			isProcessingChain = false;
+			if (chainCount > 0) {
+				totalChains += chainCount; // 連鎖があった場合にのみtotalChainsを更新
+				chainCount = 0; // 連鎖数をリセット
+			}
+		}
+	}
+
+	function checkForChains() {
+		let toClear = new Set();
+            let toClearGray = new Set();  // グレーぷよを消すためのセット
+
+		for (let y = 0; y < rows; y++) {
+			for (let x = 0; x < cols; x++) {
+				if (board[y][x] && board[y][x] !== "gray") { // grayぷよは4連で消えない
+					const color = board[y][x];
+					const cluster = new Set();
+					findMatches(x, y, color, cluster);
+					if (cluster.size >= 4) {
+						cluster.forEach(pos => toClear.add(pos));
+					}
+				}
+			}
+		}
+
+		if (toClear.size > 0) {
+			// グレーぷよの隣接チェック
+			toClear.forEach(pos => {
+				const [cx, cy] = pos.split('-').map(Number);
+				[
+					[1, 0],
+					[-1, 0],
+					[0, 1],
+					[0, -1]
+				].forEach(([dx, dy]) => {
+					const nx = cx + dx;
+					const ny = cy + dy;
+                if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && board[ny][nx] === "gray") {
+                    toClearGray.add(`${nx}-${ny}`);
+                }
+				});
+			});
+
+			// 消去処理
+			toClear.forEach(pos => {
+				const [cx, cy] = pos.split('-').map(Number);
+				board[cy][cx] = 0;
+			});
+                    toClearGray.forEach(pos => {
+            const [cx, cy] = pos.split('-').map(Number);
+            board[cy][cx] = 0;
+        });
+			return true;
+		}
+		return false;
+	}
+
+	function findMatches(x, y, color, cluster) {
+		const stack = [
+			[x, y]
+		];
+		while (stack.length) {
+			const [cx, cy] = stack.pop();
+			if (!cluster.has(`${cx}-${cy}`) && board[cy][cx] === color) {
+				cluster.add(`${cx}-${cy}`);
+				[
+					[1, 0],
+					[-1, 0],
+					[0, 1],
+					[0, -1]
+				].forEach(([dx, dy]) => {
+					const nx = cx + dx;
+					const ny = cy + dy;
+					if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) {
+						stack.push([nx, ny]);
+					}
+				});
+			}
+		}
+	}
+
+	function applyGravity() {
+		for (let x = 0; x < cols; x++) {
+			let emptyRow = rows - 1;
+			for (let y = rows - 1; y >= 0; y--) {
+				if (board[y][x]) {
+					if (y !== emptyRow) {
+						board[emptyRow][x] = board[y][x];
+						board[y][x] = 0;
+					}
+					emptyRow--;
+				}
+			}
+		}
+	}
+
+
+	//ゲームオーバー
+	let gameOverDisplayed = false; // ゲームオーバー画像が表示されたかどうか
+	const gameOverImage = new Image();
+	gameOverImage.src = 'img/batankyu.png'; // ゲームオーバー画像の設定
+
+	// ぷよの初期位置に❌を表示するための設定
+	const initialX = 2;
+	const initialY = 0;
+
+	function checkGameOver() {
+		// ぷよが最初に降ってくる場所（❌の位置）に固定された場合
+		if (board[initialY][initialX] || board[initialY + 1][initialX]) {
+			if (!gameOverDisplayed) {
+				gameOverDisplayed = true;
+				// ゲームオーバー処理：フレームアウトさせてからゲームオーバー画像を表示
+				frameOutAndDisplayGameOver();
+			}
+		}
+	}
+
+	function frameOutAndDisplayGameOver() {
+		let moveDown = setInterval(() => {
+			ctx.clearRect(0, 0, canvas.width, canvas.height); // 画面をクリア
+
+			// すべてのぷよを下に移動
+			for (let y = 0; y < rows; y++) {
+				for (let x = 0; x < cols; x++) {
+					if (board[y][x]) {
+						ctx.drawImage(images[board[y][x]], x * puyoSize, y * puyoSize, puyoSize,
+							puyoSize);
+					}
+				}
+			}
+
+			// ぷよが画面外に出るまでフレームアウト
+			ctx.translate(0, 20); // 画面を20px下に移動
+			if (ctx.getTransform().f >= canvas.height) {
+				clearInterval(moveDown);
+				ctx.translate(0, -canvas.height); // 元の位置に戻す
+				displayGameOver();
+			}
+		}, 30); // 30msごとに下に移動
+	}
+
+	function displayGameOver() {
+		// ゲームオーバー画像（ばたんきゅー）を中央に表示
+		const centerX = canvas.width / 2 - gameOverImage.width / 4; // 画像の幅を半分に調整
+		const centerY = canvas.height / 2 - gameOverImage.height / 4; // 画像の高さを半分に調整
+
+		ctx.clearRect(0, 0, canvas.width, canvas.height); // 画面をクリア
+		ctx.drawImage(gameOverImage, centerX, centerY, gameOverImage.width / 2,
+			gameOverImage.height / 2); // 画像のサイズを半分にして描画
+	}
+
+
+	function drawInitialPuyo() {
+		// 初期位置に❌を表示
+		ctx.font = "20px Arial"; // フォントサイズを40pxに設定
+		ctx.fillStyle = "red"; // 色を赤に設定
+		const text = "❌"; // 表示する文字
+		const textWidth = ctx.measureText(text).width;
+		const centerX = initialX * puyoSize + (puyoSize - textWidth) / 2; // 横方向の中央に配置
+		const centerY = initialY * puyoSize + puyoSize / 2 + 20; // 縦方向の中央に配置
+
+		ctx.fillText(text, centerX, centerY); // ❌を初期位置に表示
+	}
+
+	function applyGravitySmoothly() {
+		const animationInterval = 50; // ミリ秒単位での落下速度（数値を増やすと遅くなる）
+
+		// アニメーション用のタイマーを設定
+		let gravityInterval = setInterval(() => {
+			let moved = false;
+
+			// すべての列に対して重力を適用
+			for (let x = 0; x < cols; x++) {
+				for (let y = rows - 2; y >= 0; y--) { // 下から順に確認
+					if (board[y][x] && !board[y + 1][x]) { // 下のマスが空いている場合
+						board[y + 1][x] = board[y][x];
+						board[y][x] = 0;
+						moved = true;
+					}
+				}
+			}
+
+			// 一段下げた後にボードを描画
+			drawBoard();
+
+			// ぷよが移動しなかったらアニメーション停止
+			if (!moved) {
+				clearInterval(gravityInterval);
+			}
+		}, animationInterval);
+	}
+
+	function setGrayPuyo(x, y) {
+		// 指定した位置にグレーのぷよを設置
+		if (x >= 0 && x < cols && y >= 0 && y < rows && !board[y][x]) {
+			board[y][x] = "gray"; // グレーのぷよを配置
+			applyGravitySmoothly(); // スムーズに重力を適用
+			drawBoard();
+		} else {
+			console.warn("指定された位置が無効、または既にぷよが存在しています。");
+		}
+	}
+
+function setGrayPuyos(count) {
+  let delay = 0; // 最初の遅延時間を0に設定
+  for (let f = 0; f < count; f++) {  // count回繰り返す
+    for (let i = 0; i <= 5; i++) {
+      setTimeout(function() {
+        setGrayPuyo(i, 2);  // iが0から5まで、2列目に灰色のぷよを設置
+      }, delay);
+    }
+    delay += 100;  // fごとに500ms遅延させる
+  }
+}
+
+//setGrayPuyos(2);
+
+
+
+        function setGrayes(count) {
+  if (count < 6) {
+    // countが6未満の場合、ランダムなxにy = 2で灰色のぷよを降らせる
+    for (let i = 0; i < count; i++) {
+      let x = Math.floor(Math.random() * cols); // 0からcols-1のランダムなx
+      setGrayPuyo(x, 2);  // y = 2にランダムなxで灰色のぷよを設置
+    }
+  } else {
+    // countが6以上の場合、setGrayPuyosを使用し、その後ランダムに残りのぷよを降らせる
+    let sets = Math.floor(count / 6);  // 6つの塊をいくつ作るか
+    setGrayPuyos(sets); // setGrayPuyosをsets回呼び出す（6つずつ降らせる）
+    
+    let remaining = count % 6; // 残りのぷよ数
+    if (remaining > 0) {
+      // 残りのぷよをランダムな位置に降らせる
+      for (let i = 0; i < remaining; i++) {
+        let x = Math.floor(Math.random() * cols); // 0からcols-1のランダムなx
+        setGrayPuyo(x, 2);  // y = 2にランダムなxで灰色のぷよを設置
+      }
+    }
+  }
+}
+
+
+	document.addEventListener("keydown", (e) => {
+		if (isProcessingChain) return;
+		if (e.key === "x") rotatePuyo(true);
+		if (e.key === "z") rotatePuyo(false);
+		if (e.key.startsWith("Arrow")) keyState[e.key] = true;
+	});
+
+	document.addEventListener("keyup", (e) => {
+		if (e.key.startsWith("Arrow")) keyState[e.key] = false;
+	});
+
+	update();
+setInterval(startChainProcessing, 1000);
+
+	</script>
+</body>
+
+</html>
