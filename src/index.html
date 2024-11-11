@@ -40,6 +40,18 @@
 	let waitStartTime = 0;
 	let waitingput = 500;
 	let upMoveCount = 0;
+const sounds = {
+  1: new Audio('sounds/1.wav'),
+  2: new Audio('sounds/2.wav'),
+  3: new Audio('sounds/3.wav'),
+  4: new Audio('sounds/4.wav'),
+  5: new Audio('sounds/5.wav'),
+  6: new Audio('sounds/6.wav'),
+  7: new Audio('sounds/7.wav'),
+  8: new Audio('sounds/8.wav')
+};
+
+
 	let imagesrc = 'img';
 	const images = {
 		red: new Image(),
@@ -172,19 +184,37 @@
 	}
 
 
-	function rotatePuyo(clockwise = true) {
-		const {
-			x, y, rotation
-		} = currentPuyo;
-		const newRotation = (rotation + (clockwise ? 1 : 3)) % 4;
-		if (isValidPosition(x, y, newRotation)) {
-			currentPuyo.rotation = newRotation;
-		} else if (upMoveCount < 6 && isValidPosition(x, y - 1, newRotation)) {
-			currentPuyo.y -= 1;
-			currentPuyo.rotation = newRotation;
-			upMoveCount++;
-		}
-	}
+function rotatePuyo(clockwise = true) {
+    const { x, y, rotation } = currentPuyo;
+    const newRotation = (rotation + (clockwise ? 1 : 3)) % 4;
+
+    // 回転後の位置を計算
+    const [dx, dy] = getRotationOffset(newRotation);
+    const newX = x + dx;
+    const newY = y + dy;
+
+    // 回転後に位置が有効かどうかをチェック
+    if (isValidPosition(newX, newY, newRotation)) {
+        currentPuyo.rotation = newRotation;
+    } else {
+        // 壁やぷよに挟まれている場合、1マス横にずれて回転を試みる
+        if (isValidPosition(x - 1, y, newRotation)) {
+            currentPuyo.x = x - 1; // 左にずれる
+            currentPuyo.rotation = newRotation;
+        } else if (isValidPosition(x + 1, y, newRotation)) {
+            currentPuyo.x = x + 1; // 右にずれる
+            currentPuyo.rotation = newRotation;
+        }
+        // それでもダメなら、1マス上に移動して回転を試みる
+        else if (upMoveCount < 6 && isValidPosition(x, y - 1, newRotation)) {
+            currentPuyo.y -= 1; // 1マス上に移動
+            currentPuyo.rotation = newRotation;
+            upMoveCount++; // 上移動回数をカウント
+        }
+    }
+}
+
+
 
 	function isValidPosition(x, y, rotation) {
 		const [dx, dy] = getRotationOffset(rotation);
@@ -216,23 +246,27 @@
 		performChains();
 	}
 
-	// 連鎖処理
-	function performChains() {
-		let chainOccurred = checkForChains();
-		if (chainOccurred) {
-			chainCount++;
-			applyGravity();
-			setTimeout(performChains, chainDelay);
-		} else {
-			// 連鎖が終わった
-			isProcessingChain = false;
-			if (chainCount > 0) {
-				totalChains += chainCount;
-				chainCount = 0;
-			}
-			// 次のぷよを生成しない
-		}
-	}
+function performChains() {
+    let chainOccurred = checkForChains();
+    if (chainOccurred) {
+        chainCount++;
+        applyGravity();
+        setTimeout(performChains, chainDelay);
+
+        // 効果音を鳴らす
+        const chainSound = sounds[Math.min(chainCount, 8)]; // 最大8連鎖まで
+        chainSound.play();
+    } else {
+        // 連鎖が終わった
+        isProcessingChain = false;
+        if (chainCount > 0) {
+            totalChains += chainCount;
+            chainCount = 0;
+        }
+        // 次のぷよを生成しない
+    }
+}
+
 
 	function checkForChains() {
 		let toClear = new Set();
