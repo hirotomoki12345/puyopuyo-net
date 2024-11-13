@@ -45,7 +45,10 @@ ws.onmessage = (event) => {
 			if (ctx.getTransform().f >= canvas.height) {
 				clearInterval(moveDown);
 				ctx.translate(0, -canvas.height);
-                showtext("you win")
+                showtext("you win");
+                setTimeout(function() {
+                  location.reload();
+                }, 5000);
 			}
 		}, 30);
             }
@@ -108,6 +111,7 @@ function requestMatching() {
         matchRequest: true
     }));
     console.log('マッチングリクエストを送信しました');
+    showtext("マッチング中");
 }
 
 
@@ -181,3 +185,9 @@ function startgameclients() {
 
 }
 
+		function updateGrayPuyoCounter() {
+			// announce divにgraypuyocounterを表示
+			document.getElementById("announce").innerText = "Gray Puyo Count: " + graypuyocounter;
+		}
+
+		setInterval(updateGrayPuyoCounter, 1000);
