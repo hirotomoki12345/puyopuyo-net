@@ -228,27 +228,31 @@ function rotatePuyo(clockwise = true) {
         generateNextPuyo();
 		startChainProcessing();
 	}
-        
-let graypuyocounter = 0;
+let graypuyocounter = 1;
 
 function triggerGrayPuyo(count) {
-    // countが数値または数値として解釈できる文字列の場合
     if (typeof count === 'number' || !isNaN(Number(count))) {
-        graypuyocounter += Number(count) * graypuyocounter; // 数値に変換して加算
+        // countが数値または数値として解釈できる文字列の場合
+        graypuyocounter += Number(count) * graypuyocounter;
+        graypuyocounter = graypuyocounter ** 2;
     } 
-    // countが配列の場合、ソートを実施
     else if (Array.isArray(count)) {
+        // countが配列の場合、配列内の数値を順番に処理してgraypuyocounterに反映
         count.sort((a, b) => a - b); // 数値の昇順にソート
         console.log('ソート後の配列:', count);
+        
+        count.forEach(value => {
+            graypuyocounter += value * graypuyocounter;
+            graypuyocounter = graypuyocounter ** 2;
+        });
     }
-    // countが数値でも配列でもない場合（文字列など）
     else {
+        // countが数値でも配列でもない場合（文字列など）
         console.log('無効な入力です。count は数値または配列である必要があります。');
     }
 
     console.log('現在の graypuyocounter:', graypuyocounter);
 }
-
 
 
 
