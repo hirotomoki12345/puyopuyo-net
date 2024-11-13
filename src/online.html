@@ -257,8 +257,8 @@ let graypuyocounter = 0;
 function triggerGrayPuyo(count) {
     if (typeof count === 'number' || !isNaN(Number(count))) {
         // countが数値または数値として解釈できる文字列の場合
-        graypuyocounter += Number(count);
-        graypuyocounter = graypuyocounter ** 2;
+        graypuyocounter += Number(count) * 3;
+        graypuyocounter = graypuyocounter - 2;
     } 
     else if (Array.isArray(count)) {
         // countが配列の場合、配列内の数値を順番に処理してgraypuyocounterに反映
@@ -281,12 +281,15 @@ function triggerGrayPuyo(count) {
 
 
 function generateNextPuyo() {
-    const nextPuyo = generatePuyo();  // nextPuyoを生成
-    currentPuyo = nextPuyo;           // currentPuyoに代入
-    if (graypuyocounter > 0) {        // graypuyocounterがある場合
-setTimeout(() => {
-    setGrayes(graypuyocounter);
-}, 1000);
+    currentPuyo = nextPuyo;
+    nextPuyo = generatePuyo(); // 次のぷよを準備
+
+    // グレーぷよを降らせる条件
+    if (graypuyocounter > 0) {
+        setTimeout(() => {
+            setGrayes(graypuyocounter);
+            graypuyocounter = 0; // グレーぷよを降らせたらカウンターをリセット
+        }, 650);
     }
 }
 
@@ -484,10 +487,12 @@ function checkForChains() {
 
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		ctx.drawImage(gameOverImage, centerX, centerY, gameOverImage.width / 2,
-			gameOverImage.height / 2);
+		gameOverImage.height / 2);
             sendMessage(matchedUserId, "you win");
-
-	}
+setTimeout(function() {
+  location.reload();
+}, 5000);
+    }
 
 
 	function drawInitialPuyo() {
