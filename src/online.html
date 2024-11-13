@@ -5,13 +5,37 @@
 	<meta charset="UTF-8">
 	<title>Puyo Puyo Game</title>
 	<style>
-	canvas { border: 1px solid black; }
+		#container {
+			display: flex;
+			flex-direction: column; /* 縦方向に配置 */
+			align-items: center; /* 中央揃え */
+		}
+		#announce {
+			margin-bottom: 8px; /* gameCanvasとの間に隙間を作る */
+			text-align: center;
+		}
+		#gameCanvasContainer {
+			display: flex;
+			flex-direction: row; /* 横並びに配置 */
+			align-items: flex-start; /* 上に揃える */
+		}
+		canvas {
+			border: 1px solid black;
+		}
+		#others {
+			margin-left: 16px; /* gameCanvas との間に隙間を作る */
+		}    
 	</style>
 </head>
 
 <body>
-	<canvas id="gameCanvas" width="240" height="480"></canvas>
-    <canvas id="others" width="240" height="480"></canvas>
+	<div id="container">
+		<div id="announce">Gray Puyo Count: 0</div>
+		<div id="gameCanvasContainer">
+			<canvas id="gameCanvas" width="240" height="480"></canvas>
+			<canvas id="others" width="240" height="480"></canvas>
+		</div>
+	</div>
 <script src = "draw_user.js"></script>
 
 	<script>
@@ -228,12 +252,12 @@ function rotatePuyo(clockwise = true) {
         generateNextPuyo();
 		startChainProcessing();
 	}
-let graypuyocounter = 1;
+let graypuyocounter = 0;
 
 function triggerGrayPuyo(count) {
     if (typeof count === 'number' || !isNaN(Number(count))) {
         // countが数値または数値として解釈できる文字列の場合
-        graypuyocounter += Number(count) * graypuyocounter;
+        graypuyocounter += Number(count);
         graypuyocounter = graypuyocounter ** 2;
     } 
     else if (Array.isArray(count)) {
@@ -260,8 +284,9 @@ function generateNextPuyo() {
     const nextPuyo = generatePuyo();  // nextPuyoを生成
     currentPuyo = nextPuyo;           // currentPuyoに代入
     if (graypuyocounter > 0) {        // graypuyocounterがある場合
-        setGrayes(graypuyocounter);
-        graypuyocounter = 0;          // カウンターをリセット
+setTimeout(() => {
+    setGrayes(graypuyocounter);
+}, 1000);
     }
 }
 
@@ -284,8 +309,21 @@ function generateNextPuyo() {
 			isProcessingChain = false;
 			if (chainCount > 0) {
 				totalChains += chainCount;
-                //連鎖を送信
-                sendMessage(matchedUserId, `ren${chainCount}`);
+        // 連鎖を送信
+        if (graypuyocounter > 0) {
+            // chainCountをgraypuyocounterから引く
+            graypuyocounter -= chainCount;
+        
+            // もしgraypuyocounterが0より小さくなったら、残りの数をsendMessage
+            if (graypuyocounter <= 0) {
+                let remainingChain = Math.abs(graypuyocounter); // 余った数字を計算
+                graypuyocounter = 0; // graypuyocounterを0にリセット
+                sendMessage(matchedUserId, `ren${remainingChain}`); // 余りを送信
+            }
+        } else {
+            // graypuyocounterが0以下なら、普通にsendMessageで送信
+            sendMessage(matchedUserId, `ren${chainCount}`);
+        }
 
 				chainCount = 0;
 			}
@@ -530,6 +568,8 @@ function checkForChains() {
 				}
 			}
 		}
+                graypuyocounter = 0;          // カウンターをリセット
+
 	}
 
 
