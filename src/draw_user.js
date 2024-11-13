@@ -50,27 +50,26 @@ ws.onmessage = (event) => {
 		}, 30);
             }
         }
-        // 連鎖を受信
-        if (data.message) {
-            if (data.message.includes("ren")) {
-                // "ren" の後の数字部分を抽出して rens に格納
-                const rens = [];
-                
-                // 正規表現で "ren" の後に続く数字をすべて取得
-                const matches = data.message.match(/ren(\d+)/g);
-                
-                if (matches) {
-                    matches.forEach(match => {
-                        const number = match.replace('ren', ''); // "ren" を削除して数字部分を取得
-                        rens.push(Number(number)); // 数字を配列に格納
-                    });
-                }
+// 連鎖を受信
+if (data.message) {
+    if (data.message.includes("ren")) {
+        // "ren" の後の数字部分を抽出して rens に格納
+        const rens = [];
         
-                console.log(rens); // 例えば "rens" を確認する
- 
-                triggerGrayPuyo(rens);
-            }
+        // 正規表現で "ren" の後に続く数字をすべて取得
+        const matches = data.message.match(/ren(\d+)/g);
+        
+        if (matches) {
+            matches.forEach(match => {
+                const number = match.replace('ren', ''); // "ren" を削除して数字部分を取得
+                rens.push(Number(number)); // 数字を配列に格納
+            });
         }
+
+        console.log(rens); // "rens" を確認する用のログ
+        triggerGrayPuyo(rens);
+    }
+}        
 
 
         
