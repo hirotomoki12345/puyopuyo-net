@@ -30,7 +30,7 @@
 
 <body>
 	<div id="container">
-		<div id="announce">Gray Puyo Count: 0</div>
+<div id="announce"></div>
 		<div id="gameCanvasContainer">
 			<canvas id="gameCanvas" width="240" height="480"></canvas>
 			<canvas id="others" width="240" height="480"></canvas>
@@ -77,6 +77,14 @@
 		purple: new Image(),
 		gray: new Image()
 	};
+  const grayPuyoImages = {
+    1: 'img/1-puyo.png',
+    6: 'img/6-puyo.png',
+    30: 'img/30-puyo.png',
+    200: 'img/200-puyo.png',
+    300: 'img/300-puyo.png',
+    400: 'img/400-puyo.png'
+  };
 
 	images.red.src = `${imagesrc}/red.png`;
 	images.blue.src = `${imagesrc}/blue.png`;
@@ -278,7 +286,7 @@ function triggerGrayPuyo(count) {
     console.log('現在の graypuyocounter:', graypuyocounter);
 }
 
-
+    
 
 function generateNextPuyo() {
     currentPuyo = nextPuyo;
@@ -289,7 +297,7 @@ function generateNextPuyo() {
         setTimeout(() => {
             setGrayes(graypuyocounter);
             graypuyocounter = 0; // グレーぷよを降らせたらカウンターをリセット
-        }, 650);
+        }, 50);
     }
 }
 
