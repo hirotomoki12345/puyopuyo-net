@@ -185,9 +185,39 @@ function startgameclients() {
 
 }
 
-		function updateGrayPuyoCounter() {
-			// announce divにgraypuyocounterを表示
-			document.getElementById("announce").innerText = "Gray Puyo Count: " + graypuyocounter;
-		}
 
-		setInterval(updateGrayPuyoCounter, 1000);
+
+
+  function displayGrayPuyoCount(count) {
+    const announceDiv = document.getElementById('announce');
+    announceDiv.innerHTML = ''; // 初期化
+
+    let remainingCount = count;
+    const imageKeys = Object.keys(grayPuyoImages).sort((a, b) => b - a);
+
+    imageKeys.forEach(key => {
+      const keyCount = parseInt(key);
+      while (remainingCount >= keyCount) {
+        const img = document.createElement('img');
+        img.src = grayPuyoImages[key];
+        img.alt = `Gray Puyo Count: ${key}`;
+        img.style.width = '30px'; // 画像サイズは必要に応じて調整
+        announceDiv.appendChild(img);
+        remainingCount -= keyCount;
+      }
+    });
+
+    if (remainingCount > 0) {
+      const img = document.createElement('img');
+      img.src = grayPuyoImages[1];
+      img.alt = `Gray Puyo Count: ${remainingCount}`;
+      img.style.width = '30px';
+      announceDiv.appendChild(img);
+    }
+  }
+
+  function updateGrayPuyoCounter(count) {
+    displayGrayPuyoCount(graypuyocounter);
+  }
+
+setInterval(updateGrayPuyoCounter, 500);
